@@ -1,0 +1,221 @@
+-- data should be deleted first from Trips table, before executing the trigger
+Delete from Trips;
+
+1. Procedural Sql 
+
+
+--a. Trigger
+create trigger trgTripPrice
+after insert on trips 
+for each row mode db2sql 
+update trips 
+set trip_price =
+(select veh_price_hour from vehicle 
+where trips.veh_ID = vehicle.veh_ID)*    
+(select case TIMESTAMPDIFF(8,CHAR(Arrival_Time-Booking_Time))
+   when 0 then 1
+   else TIMESTAMPDIFF(8,CHAR(Arrival_Time-Booking_Time)) + 1
+   end
+from time
+where trips.time_ID=time.time_ID)
+- (Select promo_amount from promotion
+    where promotion.promo_ID = TRIPS.promo_ID);
+
+
+--Trips table data
+insert into TRIPS (Trip_ID, Cus_ID, Driver_ID, Veh_ID, Reward_ID, Time_ID, Loc_ID, Promo_ID) values 
+('TR0001','C0001','DR01','V001','R001','T001','L005',20197), 
+('TR0002','C0002','DR05','V005','R002','T002','L010',20195), 
+('TR0003','C0003','DR07','V007','R003','T003','L008',20194),
+('TR0004','C0004','DR01','V001','R004','T004','L011',20183), 
+('TR0005','C0005','DR06','V006','R005','T005','L001',20179), 
+('TR0006','C0006','DR01','V010','R006','T006','L002',20191), 
+('TR0007','C0007','DR11','V011','R007','T007','L012',20192), 
+('TR0008','C0008','DR17','V017','R008','T008','L013',21181), 
+('TR0009','C0009','DR19','V019','R009','T009','L002',20191), 
+('TR0010','C0010','DR19','V019','R010','T010','L007',21181), 
+('TR0011','C0001','DR15','V015','R001','T011','L006',20177), 
+('TR0012','C0014','DR14','V014','R014','T012','L010',20185), 
+('TR0013','C0018','DR03','V003','R018','T013','L020',20196), 
+('TR0014','C0020','DR02','V002','R020','T014','L019',20195),
+('TR0015','C0019','DR01','V001','R019','T015','L005',21180), 
+('TR0016','C0002','DR08','V008','R002','T016','L015',20179), 
+('TR0017','C0016','DR19','V019','R016','T017','L009',20184), 
+('TR0018','C0011','DR09','V009','R011','T018','L004',20194), 
+('TR0019','C0015','DR16','V016','R015','T019','L003',20195), 
+('TR0020','C0007','DR13','V013','R007','T020','L012',20188); 
+
+SELECT * FROM trips;
+
+
+----------------------------------------
+--b. Stored procedure
+create procedure addPoints()
+update trips
+set points_earned = case
+  when trip_price <= 10 then trip_price 
+   when trip_price between 11 and 20 then trip_price * 1.5 
+     when trip_price between 21 and 39 then trip_price * 2
+       when trip_price >= 40 then trip_price * 3
+end ;
+
+call addPoints();
+
+SELECT * FROM trips;
+
+----------------------------------------
+c. UDF
+create function CusPoint(CID CHAR(4))
+RETURNS TABLE
+(
+RewardNo char(4),
+PointsAvailable int
+)
+Language SQL
+Return
+(Select Reward.Reward_ID, (Select distinct( Reward.No_of_POINTS + (Select sum(trips.points_earned)as new from Trips where Trips.Reward_ID = CID)) as PointsAvailable from Reward, Trips where Reward.Reward_ID = trips.Reward_ID and reward.Reward_ID = CID ) 
+  from Trips, Reward
+   where Reward.Reward_ID = Trips.Reward_ID AND Reward.Reward_ID = CID
+       group by Reward.Reward_ID );
+
+Select * from table(CusPoint('R001'));
+
+Select * from table(CusPoint('R002'));
+
+*-------------------------------------------------------------------------------------*
+
+2.SQL
+
+--a.Joins
+Select Location.Loc_Desc, Time.Time_Clocktime, Trips.Trip_Price
+        from (( Trips INNER JOIN Location ON 
+        Trips.Loc_ID = Location.Loc_ID)
+          INNER JOIN Time ON 
+          Trips.Time_ID = Time.Time_ID)
+            ORDER BY Time.Time_Clocktime ASC;
+
+----------------------------------------
+--b.Group by/Group by Rollup/Group by Cube and having clause
+SELECT veh_type       AS VehicleType, 
+       loc_desc       AS Location, 
+       time_year      AS Year, 
+       Count(trip_id) AS NumOfTrips 
+FROM   vehicle, 
+       location, 
+       time, 
+       trips 
+WHERE  vehicle.veh_id = trips.veh_id 
+       AND trips.loc_id = location.loc_id 
+       AND trips.time_id = time.time_id 
+GROUP  BY veh_type, 
+          cube( loc_desc, time_year ) 
+HAVING time_year >= 2018 
+ORDER  BY vehicletype, 
+          location, 
+          year 
+
+----------------------------------------
+--c. Comparison operators
+Select t.cus_ID ,Cus_name, Driver_ID, trip_price, points_earned
+ from Trips t, Customer c
+Where
+t.cus_ID = c.cus_ID and
+ 	t.cus_ID <> 'C0001'
+And t.cus_ID<> 'C0014'
+And t.driver_ID <> 'DR01'
+And t.trip_price > 10 And trip_price <60	
+And t.points_earned >=20;
+
+
+-- Logical operator
+SELECT cus_name, 
+       loc_city, 
+       Count(trip_id) AS NumOfTrip 
+FROM   customer, 
+       trips, 
+       location 
+WHERE  customer.cus_id = trips.cus_id 
+       AND trips.loc_id = location.loc_id 
+       AND ( loc_city = 'Cyberjaya' 
+              OR loc_city = 'Putrajaya' ) 
+GROUP  BY cus_name, 
+          loc_city 
+ORDER  BY loc_city ASC;
+
+
+-- Special operator
+SELECT driver_name, 
+       Monthname(booking_time) AS MONTH, 
+       loc_city 
+FROM   driver d, 
+       time t, 
+       location l, 
+       trips p 
+WHERE  d.driver_id = p.driver_id 
+       AND t.time_id = p.time_id 
+       AND l.loc_id = p.loc_id 
+       AND t.time_month BETWEEN 1 AND 7 
+       AND ( d.driver_name LIKE '%m%' 
+              OR d.driver_name LIKE '%M%' );
+
+
+-- Aggregate operator
+SELECT r.driver_id, d.driver_name,
+       Sum(trip_price)    AS total, 
+       Count(r.driver_id) AS no_of_trip 
+FROM   driver d, 
+       trips r, 
+       time e 
+WHERE  r.time_id = e.time_id 
+       AND d.driver_id = r.driver_id 
+       AND e.time_month BETWEEN 1 AND 7 
+GROUP  BY r.driver_id, driver_name
+ORDER  BY total DESC; 
+
+
+
+----------------------------------------
+--d. View
+create view CusNoTrip AS
+select Cus_ID, Cus_Name
+from Customer
+where Cus_ID NOT IN (SELECT Cus_ID FROM Trips);
+
+SELECT * FROM CusNoTrip;
+
+
+----------------------------------------
+--e. Two SQL not covered in lecture
+
+--1.
+Select Cus_Name 
+From Customer 
+Where Cus_ID = ANY (Select Cus_ID from Trips where trip_price > 40); 
+
+--2.
+Select loc_city, decode (Loc_city,
+'Cyberjaya','SGR',
+'Bukit Jalil','KL',
+'Kuala Lumpur','KL')State
+from location
+limit 3;
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+

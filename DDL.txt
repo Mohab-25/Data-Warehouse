@@ -1,0 +1,94 @@
+create table TRIPS
+(
+Trip_ID char(6) not null primary key,
+Cus_ID char(5) not null,
+Driver_ID char(4) not null,
+Veh_ID char(4) not null,
+Reward_ID char(4) not null,
+Time_ID char(4) not null,
+Loc_ID char(4) not null,
+Promo_ID int,
+Points_Earned int default 0,
+Trip_Price decimal(7,2) default 0,
+Foreign key (Cus_ID) references Customer, 
+Foreign key (Driver_ID) references Driver, 
+Foreign key (Veh_ID) references Vehicle, 
+Foreign key (Reward_ID) references Reward, 
+Foreign key (Time_ID) references Time, 
+Foreign key (Loc_ID) references Location 
+);
+
+
+
+create table CUSTOMER
+(
+Cus_ID char(5) not null primary key,
+Cus_Name varchar(30) not null,
+Cus_Contact char(10) not null,
+Cus_Email varchar(30) not null
+);
+
+
+create table DRIVER
+(
+Driver_ID char(4) not null primary key,
+Driver_Name varchar(30) not null,
+Driver_Contact char(10) not null,
+Driver_License int not null
+);
+
+
+
+
+create table VEHICLE
+(
+Veh_ID char(4) not null primary key,
+Veh_Type varchar(10) not null,
+Veh_Colour varchar(10) not null,
+Veh_PLNO varchar(7) not null,
+Veh_Price_Hour decimal(5,2) not null
+);
+
+
+create table PROMOTION
+(
+Promo_ID int not null primary key,
+Promo_amount decimal(5,2) not null,
+Promo_Start date not null,
+Promo_End date not null
+);
+
+
+
+create table LOCATION
+(
+Loc_ID char(4) not null primary key,
+Loc_Desc varchar(30) not null,
+Loc_City varchar(15) not null
+);
+
+
+
+create table TIME
+(
+Time_ID char(4) not null primary key,
+Time_Year int not null,
+Time_Quarter int not null,
+Time_Month int not null,
+Time_Day int not null,
+Time_Clocktime time not null,
+Booking_Time timestamp not null,
+Arrival_Time timestamp not null
+);
+
+
+create table REWARD
+(
+Reward_ID char(4) not null primary key,
+No_Of_Points int not null,
+Points_Redem int not null
+);
+
+
+
+
